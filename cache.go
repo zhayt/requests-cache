@@ -43,6 +43,25 @@ type requestCache struct {
 	cache map[string]*cache
 }
 
+func (r *requestCache) scheduling() {
+	ticker := time.NewTicker(cacheTTL)
+	for range ticker.C {
+		newCache := make(map[string]*cache, maxCacheSize)
+
+		r.m.Lock()
+		for key, val := range r.cache {
+			if val.tStart.After(time.Now().Add(cacheTTL)) {
+				newCache[key] = val
+			}
+		}
+		r.m.Unlock()
+
+		r.m.Lock()
+		r.cache = newCache
+		r.m.Unlock()
+	}
+}
+
 func (r *requestCache) do(req *http.Request, client http.Client) (*http.Response, error) {
 	var val *cache
 	var ok bool
